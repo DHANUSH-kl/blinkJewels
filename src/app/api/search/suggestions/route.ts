@@ -1,8 +1,8 @@
 // src/app/api/search/suggestions/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import  {connectToDatabase}  from '@/lib/mongoose';
-import {Product} from '@/models/Product';
-import {Category} from '@/models/Category';
+import { connectToDatabase } from '@/lib/mongoose';
+import { Product } from '@/models/Product';
+import { Category } from '@/models/Category';
 
 interface SearchSuggestion {
   id: string;
@@ -24,32 +24,39 @@ export async function GET(request: NextRequest) {
     }
 
     await connectToDatabase();
-
     const suggestions: SearchSuggestion[] = [];
 
-    // Search for products
+    console.log(`Searching suggestions for: "${query}"`);
+
+    // Search for products - FIXED: Using 'title' instead of 'name'
     const products = await Product.find({
       $or: [
-        { name: { $regex: query, $options: 'i' } },
+        { title: { $regex: query, $options: 'i' } },
         { description: { $regex: query, $options: 'i' } },
         { tags: { $in: [new RegExp(query, 'i')] } }
-      ],
-      isActive: true
+      ]
     })
+    .populate('categories', 'name')
     .limit(5)
-    .select('_id name category price images rating')
+    .select('_id title categories price images rating')
     .lean();
+
+    console.log(`Found ${products.length} product suggestions`);
 
     // Add product suggestions
     products.forEach(product => {
+      const categoryNames = Array.isArray(product.categories) 
+        ? product.categories.map((cat: any) => cat.name).join(', ')
+        : 'Uncategorized';
+
       suggestions.push({
         id: product._id.toString(),
-        title: product.name,
+        title: product.title, // FIXED: Using title from model
         type: 'product',
-        category: product.category,
+        category: categoryNames,
         price: product.price,
         rating: product.rating || 4.5,
-        image: product.images?.[0]
+        image: product.images?.[0]?.url
       });
     });
 
@@ -62,6 +69,8 @@ export async function GET(request: NextRequest) {
       .select('_id name slug')
       .lean();
 
+      console.log(`Found ${categories.length} category suggestions`);
+
       // Add category suggestions
       categories.forEach(category => {
         suggestions.push({
@@ -72,6 +81,8 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    console.log(`Returning ${suggestions.length} suggestions`);
+
     return NextResponse.json({
       suggestions,
       query
@@ -80,7 +91,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Search suggestions error:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch search suggestions' },
+      { error: 'Failed to fetch search suggestions', details: error.message },
       { status: 500 }
     );
   }

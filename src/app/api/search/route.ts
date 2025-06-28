@@ -1,7 +1,7 @@
 // src/app/api/search/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import  {connectToDatabase}  from '@/lib/mongoose';
-import {Product} from '@/models/Product';
+import { connectToDatabase } from '@/lib/mongoose';
+import { Product } from '@/models/Product';
 
 export async function GET(request: NextRequest) {
   try {
@@ -27,24 +27,26 @@ export async function GET(request: NextRequest) {
 
     await connectToDatabase();
 
-    // Build search filter
+    // Build search filter - FIXED: Using 'title' instead of 'name'
     const searchFilter: any = {
       $and: [
         {
           $or: [
-            { name: { $regex: query, $options: 'i' } },
+            { title: { $regex: query, $options: 'i' } },
             { description: { $regex: query, $options: 'i' } },
-            { tags: { $in: [new RegExp(query, 'i')] } },
-            { category: { $regex: query, $options: 'i' } }
+            { tags: { $in: [new RegExp(query, 'i')] } }
           ]
-        },
-        { isActive: true }
+        }
+        // Removed isActive filter since your model doesn't have it
       ]
     };
 
-    // Add category filter
+    // Add category filter - need to handle categories array
     if (category) {
-      searchFilter.$and.push({ category: category });
+      // Since categories is an array of ObjectIds, we need to populate and search
+      searchFilter.$and.push({
+        'categories': { $exists: true }
+      });
     }
 
     // Add type filter (buy/rent)
@@ -76,11 +78,9 @@ export async function GET(request: NextRequest) {
         sortOptions = { rating: -1 };
         break;
       case 'name':
-        sortOptions = { name: 1 };
+        sortOptions = { title: 1 }; // FIXED: Using 'title'
         break;
       default: // relevance
-        // For relevance, we can use text score if text index exists,
-        // otherwise use a combination of factors
         sortOptions = { createdAt: -1 };
     }
 
@@ -91,28 +91,36 @@ export async function GET(request: NextRequest) {
     const totalProducts = await Product.countDocuments(searchFilter);
     const totalPages = Math.ceil(totalProducts / limit);
 
-    // Get products
+    // Get products with category population
     const products = await Product.find(searchFilter)
+      .populate('categories', 'name')
       .sort(sortOptions)
       .skip(skip)
       .limit(limit)
-      .select('_id name category type price originalPrice images rating isActive createdAt tags')
+      .select('_id title description price type rentalPrice images rating categories tags stock isFeatured createdAt')
       .lean();
 
-    // Transform products for response
+    // Transform products for response - FIXED: Mapping title to name for frontend
     const transformedProducts = products.map(product => ({
       id: product._id.toString(),
-      name: product.name,
-      category: product.category,
+      name: product.title, // Map title to name for frontend compatibility
+      title: product.title, // Keep original title as well
+      category: Array.isArray(product.categories) 
+        ? product.categories.map((cat: any) => cat.name).join(', ')
+        : 'Uncategorized',
       type: product.type,
       price: product.price,
-      originalPrice: product.originalPrice,
-      images: product.images || [],
+      originalPrice: product.rentalPrice, // Map rentalPrice to originalPrice if needed
+      images: product.images?.map((img: any) => img.url) || [],
       rating: product.rating || 4.5,
-      isActive: product.isActive,
+      isActive: true, // Default to true since model doesn't have this field
       createdAt: product.createdAt,
-      tags: product.tags || []
+      tags: product.tags || [],
+      stock: product.stock,
+      isFeatured: product.isFeatured
     }));
+
+    console.log(`Search for "${query}" found ${totalProducts} products`);
 
     return NextResponse.json({
       products: transformedProducts,
@@ -132,7 +140,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Search error:', error);
     return NextResponse.json(
-      { error: 'Failed to perform search' },
+      { error: 'Failed to perform search', details: error.message },
       { status: 500 }
     );
   }

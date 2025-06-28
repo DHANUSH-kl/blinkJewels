@@ -1,4 +1,4 @@
-// src/components/search/EnhancedSearchBar.tsx - Complete version
+// src/components/search/EnhancedSearchBar.tsx - Fixed with direct product navigation
 "use client";
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -49,7 +49,7 @@ const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
-  // Trending searches - could be fetched from API
+  // Trending searches
   const trendingSearches = [
     'Gold Necklace',
     'Diamond Earrings', 
@@ -59,7 +59,7 @@ const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
     'Engagement Ring'
   ];
 
-  // Load recent searches from sessionStorage (Next.js compatible)
+  // Load recent searches from sessionStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = sessionStorage.getItem('recentSearches');
@@ -84,49 +84,27 @@ const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
 
       try {
         setLoading(true);
+        console.log(`Fetching suggestions for: "${searchQuery}"`);
+        
         const response = await fetch(`/api/search/suggestions?q=${encodeURIComponent(searchQuery)}`);
         
         if (response.ok) {
           const data = await response.json();
+          console.log('Suggestions response:', data);
           setSuggestions(data.suggestions || []);
         } else {
-          console.warn('Suggestions API not available, using fallback');
-          // Fallback to mock suggestions if API not available
-          const mockSuggestions = generateMockSuggestions(searchQuery);
-          setSuggestions(mockSuggestions);
+          console.error('Suggestions API error:', response.status, response.statusText);
+          setSuggestions([]);
         }
       } catch (error) {
         console.error('Search suggestions error:', error);
-        // Fallback to mock suggestions
-        const mockSuggestions = generateMockSuggestions(searchQuery);
-        setSuggestions(mockSuggestions);
+        setSuggestions([]);
       } finally {
         setLoading(false);
       }
     }, 300),
     []
   );
-
-  // Generate mock suggestions for fallback
-  const generateMockSuggestions = (searchQuery: string): SearchSuggestion[] => {
-    const mockProducts = [
-      'Gold Necklace Set', 'Diamond Earrings', 'Silver Bracelet', 'Pearl Necklace',
-      'Wedding Ring', 'Engagement Ring', 'Gold Chain', 'Diamond Pendant',
-      'Ruby Ring', 'Emerald Earrings', 'Platinum Bracelet', 'Sapphire Necklace'
-    ];
-
-    return mockProducts
-      .filter(item => item.toLowerCase().includes(searchQuery.toLowerCase()))
-      .slice(0, 5)
-      .map((item, index) => ({
-        id: `mock-${index}`,
-        title: item,
-        type: 'product' as const,
-        category: 'Jewelry',
-        price: Math.floor(Math.random() * 50000) + 5000,
-        rating: Math.floor(Math.random() * 2) + 4
-      }));
-  };
 
   // Handle input changes
   useEffect(() => {
@@ -140,9 +118,11 @@ const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
     }
   }, [query, debouncedSearch]);
 
-  // Handle search execution
+  // Handle search execution (for general search queries)
   const handleSearch = (searchQuery: string) => {
     if (!searchQuery.trim()) return;
+
+    console.log(`Executing search for: "${searchQuery}"`);
 
     // Save to recent searches
     if (typeof window !== 'undefined') {
@@ -151,12 +131,11 @@ const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
       sessionStorage.setItem('recentSearches', JSON.stringify(updated));
     }
 
-    // Execute search
+    // Execute search - navigate to products page with search query
     if (onSearch) {
       onSearch(searchQuery);
     } else {
-      // Navigate to search page instead of products page
-      router.push(`/search?search=${encodeURIComponent(searchQuery)}`);
+      router.push(`/products?search=${encodeURIComponent(searchQuery)}`);
     }
 
     setShowSuggestions(false);
@@ -186,13 +165,25 @@ const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
     inputRef.current?.focus();
   };
 
-  // Handle suggestion click
+  // Handle suggestion click - UPDATED for direct product navigation
   const handleSuggestionClick = (suggestion: SearchSuggestion) => {
-    if (suggestion.type === 'category') {
-      // Navigate to category page
+    console.log('Suggestion clicked:', suggestion);
+    
+    // Close suggestions dropdown
+    setShowSuggestions(false);
+    
+    // Navigate based on suggestion type
+    if (suggestion.type === 'product') {
+      // Direct navigation to product detail page
+      console.log(`Navigating to product: /product/${suggestion.id}`);
+      router.push(`/product/${suggestion.id}`);
+    } else if (suggestion.type === 'category') {
+      // Navigate to products page with category filter
+      console.log(`Navigating to category: /products?category=${suggestion.title}`);
       router.push(`/products?category=${encodeURIComponent(suggestion.title)}`);
     } else {
-      // Search for the suggestion
+      // For recent/trending searches, do a general search
+      console.log(`Performing search for: ${suggestion.title}`);
       handleSearch(suggestion.title);
     }
   };
@@ -236,6 +227,8 @@ const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
         return <TrendingUp className="w-4 h-4 text-orange-500" />;
       case 'category':
         return <Tag className="w-4 h-4 text-blue-500" />;
+      case 'product':
+        return <Search className="w-4 h-4 text-green-500" />;
       default:
         return <Search className="w-4 h-4 text-gray-400" />;
     }
@@ -245,7 +238,7 @@ const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
   const getDisplaySuggestions = () => {
     const allSuggestions: SearchSuggestion[] = [];
 
-    // Add API suggestions first
+    // Add API suggestions first (products and categories)
     allSuggestions.push(...suggestions);
 
     // If no query, show recent and trending
@@ -323,20 +316,32 @@ const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
 
           {!loading && getDisplaySuggestions().length > 0 && (
             <div className="py-2">
+              {/* Show section headers */}
               {!query.trim() && recentSearches.length > 0 && (
                 <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">
                   Recent Searches
                 </div>
               )}
 
+              {/* Display suggestions with enhanced styling for products */}
               {getDisplaySuggestions().map((suggestion, index) => (
                 <button
                   key={`${suggestion.type}-${suggestion.id}`}
                   onClick={() => handleSuggestionClick(suggestion)}
                   className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center space-x-3 transition-colors duration-150"
                 >
-                  {getSuggestionIcon(suggestion.type)}
+                  {/* Icon */}
+                  {suggestion.image ? (
+                    <img 
+                      src={suggestion.image} 
+                      alt={suggestion.title}
+                      className="w-8 h-8 rounded object-cover flex-shrink-0"
+                    />
+                  ) : (
+                    getSuggestionIcon(suggestion.type)
+                  )}
                   
+                  {/* Content */}
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-gray-900 truncate">
                       {suggestion.title}
@@ -347,25 +352,42 @@ const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
                         in {suggestion.category}
                       </div>
                     )}
+
+                    {/* Product type indicator */}
+                    {suggestion.type === 'product' && (
+                      <div className="text-xs text-green-600 font-medium">
+                        Product
+                      </div>
+                    )}
+                    
+                    {suggestion.type === 'category' && (
+                      <div className="text-xs text-blue-600 font-medium">
+                        Category
+                      </div>
+                    )}
                   </div>
 
-                  {suggestion.price && (
-                    <div className="text-sm font-semibold text-gray-900">
-                      {formatPrice(suggestion.price)}
-                    </div>
-                  )}
+                  {/* Price and Rating */}
+                  <div className="flex flex-col items-end space-y-1">
+                    {suggestion.price && (
+                      <div className="text-sm font-semibold text-gray-900">
+                        {formatPrice(suggestion.price)}
+                      </div>
+                    )}
 
-                  {suggestion.rating && (
-                    <div className="flex items-center space-x-1">
-                      <Star className="w-3 h-3 text-yellow-400 fill-current" />
-                      <span className="text-xs text-gray-600">
-                        {suggestion.rating}
-                      </span>
-                    </div>
-                  )}
+                    {suggestion.rating && (
+                      <div className="flex items-center space-x-1">
+                        <Star className="w-3 h-3 text-yellow-400 fill-current" />
+                        <span className="text-xs text-gray-600">
+                          {suggestion.rating}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </button>
               ))}
 
+              {/* Trending section */}
               {!query.trim() && trendingSearches.length > 0 && (
                 <>
                   <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide border-t">
@@ -390,6 +412,7 @@ const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
             </div>
           )}
 
+          {/* Empty state when no query */}
           {!loading && !query.trim() && recentSearches.length === 0 && (
             <div className="px-4 py-8 text-center text-gray-500">
               <Search className="w-8 h-8 text-gray-300 mx-auto mb-2" />
@@ -397,6 +420,7 @@ const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
             </div>
           )}
 
+          {/* No results state */}
           {!loading && query.trim() && getDisplaySuggestions().length === 0 && (
             <div className="px-4 py-8 text-center text-gray-500">
               <Search className="w-8 h-8 text-gray-300 mx-auto mb-2" />
