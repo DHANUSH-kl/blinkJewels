@@ -1,9 +1,11 @@
+// src/components/Navbar.tsx - Complete Enhanced Navbar with Search
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, signIn, useSession } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
 import { ShoppingCart, Heart, User, ChevronDown, Menu, X, Search } from "lucide-react";
+import EnhancedSearchBar from "./search/EnhancedSearchBar";
 
 const Navbar = () => {
   const { data: session, status } = useSession();
@@ -87,10 +89,18 @@ const Navbar = () => {
     setRentDropdownOpen(false);
     setAccountOpen(false);
     setMobileMenuOpen(false);
+    setSearchOpen(false); // Also close mobile search
   }, [pathname]);
 
   const handleLogout = async () => {
     await signOut({ redirect: false });
+  };
+
+  // Handle search from navbar
+  const handleSearch = (query: string) => {
+    console.log('Search executed:', query);
+    // Close mobile search if open
+    setSearchOpen(false);
   };
 
   return (
@@ -190,16 +200,13 @@ const Navbar = () => {
             </div>
           </div>
 
-          {/* Search Bar (Desktop) */}
+          {/* Enhanced Search Bar (Desktop) */}
           <div className="hidden lg:flex flex-1 max-w-lg mx-8">
-            <div className="relative w-full">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search for jewelry..."
-                className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-              />
-            </div>
+            <EnhancedSearchBar 
+              placeholder="Search for jewelry..."
+              onSearch={handleSearch}
+              className="w-full"
+            />
           </div>
 
           {/* Right Side Actions */}
@@ -308,18 +315,15 @@ const Navbar = () => {
           </div>
         </div>
 
-        {/* Mobile Search Bar */}
+        {/* Enhanced Mobile Search Bar */}
         {searchOpen && (
           <div className="lg:hidden mt-4 animate-in slide-in-from-top-2 duration-200">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search for jewelry..."
-                className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                autoFocus
-              />
-            </div>
+            <EnhancedSearchBar 
+              placeholder="Search for jewelry..."
+              onSearch={handleSearch}
+              isMobile={true}
+              className="w-full"
+            />
           </div>
         )}
       </nav>
@@ -338,11 +342,14 @@ const Navbar = () => {
                   buyCategories.map((category: any) => (
                     <Link
                       key={category._id || category.id}
-                      href={`/buy/${category.slug}`}
+                      href={`/products?type=buy&category=${category.slug}`}
                       className="block px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-colors duration-200"
                       onClick={() => setMobileMenuOpen(false)}
                     >
-                      {category.name}
+                      <div className="flex items-center space-x-3">
+                        <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                        <span>{category.name}</span>
+                      </div>
                     </Link>
                   ))
                 ) : (
@@ -361,16 +368,46 @@ const Navbar = () => {
                   rentCategories.map((category: any) => (
                     <Link
                       key={category._id || category.id}
-                      href={`/rent/${category.slug}`}
+                      href={`/products?type=rent&category=${category.slug}`}
                       className="block px-4 py-3 text-gray-700 hover:bg-purple-50 hover:text-purple-600 rounded-xl transition-colors duration-200"
                       onClick={() => setMobileMenuOpen(false)}
                     >
-                      {category.name}
+                      <div className="flex items-center space-x-3">
+                        <div className="w-2 h-2 bg-purple-600 rounded-full"></div>
+                        <span>{category.name}</span>
+                      </div>
                     </Link>
                   ))
                 ) : (
                   <div className="text-gray-500">No rent categories available</div>
                 )}
+              </div>
+            </div>
+
+            {/* Mobile Menu Additional Links */}
+            <div className="border-t border-gray-200 pt-6">
+              <div className="space-y-2">
+                <Link
+                  href="/about"
+                  className="block px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-xl transition-colors duration-200"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  About Us
+                </Link>
+                <Link
+                  href="/contact"
+                  className="block px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-xl transition-colors duration-200"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Contact
+                </Link>
+                <Link
+                  href="/support"
+                  className="block px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-xl transition-colors duration-200"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Support
+                </Link>
               </div>
             </div>
           </div>

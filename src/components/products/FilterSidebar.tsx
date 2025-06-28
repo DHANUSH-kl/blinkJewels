@@ -1,8 +1,10 @@
+// /componenet/products/FilterSidebar.tsx
+
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Search, ChevronDown, Star, Tag, Palette, Filter, X, Check, ShoppingBag, Home } from "lucide-react";
+import { Search, ChevronDown, Star, Tag, Palette, Filter, X, Check, ShoppingBag, Home, RotateCcw } from "lucide-react";
 
 interface Category {
   _id: string;
@@ -16,6 +18,109 @@ interface FilterSidebarProps {
   loading?: boolean;
 }
 
+// Range Slider Component
+const RangeSlider = ({ min, max, value, onChange, formatValue }) => {
+  const [isDragging, setIsDragging] = useState(false);
+  
+  const handleChange = (e, index) => {
+    const newValue = [...value];
+    newValue[index] = parseInt(e.target.value);
+    
+    // Ensure min doesn't exceed max and vice versa
+    if (index === 0 && newValue[0] > newValue[1]) {
+      newValue[1] = newValue[0];
+    } else if (index === 1 && newValue[1] < newValue[0]) {
+      newValue[0] = newValue[1];
+    }
+    
+    onChange(newValue);
+  };
+
+  return (
+    <div className="px-2 py-4">
+      <div className="relative mb-6">
+        {/* Track */}
+        <div className="absolute top-1/2 w-full h-2 bg-gray-200 rounded-full transform -translate-y-1/2"></div>
+        
+        {/* Active Track */}
+        <div 
+          className="absolute top-1/2 h-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transform -translate-y-1/2 transition-all duration-200"
+          style={{
+            left: `${(value[0] / max) * 100}%`,
+            width: `${((value[1] - value[0]) / max) * 100}%`
+          }}
+        ></div>
+        
+        {/* Min Range Input */}
+        <input
+          type="range"
+          min={min}
+          max={max}
+          value={value[0]}
+          onChange={(e) => handleChange(e, 0)}
+          onMouseDown={() => setIsDragging(true)}
+          onMouseUp={() => setIsDragging(false)}
+          className="absolute w-full h-2 bg-transparent appearance-none cursor-pointer slider-thumb"
+          style={{ zIndex: 1 }}
+        />
+        
+        {/* Max Range Input */}
+        <input
+          type="range"
+          min={min}
+          max={max}
+          value={value[1]}
+          onChange={(e) => handleChange(e, 1)}
+          onMouseDown={() => setIsDragging(true)}
+          onMouseUp={() => setIsDragging(false)}
+          className="absolute w-full h-2 bg-transparent appearance-none cursor-pointer slider-thumb"
+          style={{ zIndex: 2 }}
+        />
+      </div>
+      
+      {/* Value Display */}
+      <div className="flex justify-between items-center text-sm">
+        <div className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full font-medium">
+          {formatValue(value[0])}
+        </div>
+        <div className="px-2 text-gray-400">-</div>
+        <div className="bg-purple-50 text-purple-700 px-3 py-1 rounded-full font-medium">
+          {formatValue(value[1])}
+        </div>
+      </div>
+      
+      <styles jsx>{`
+        .slider-thumb::-webkit-slider-thumb {
+          appearance: none;
+          height: 20px;
+          width: 20px;
+          background: white;
+          border: 3px solid #3b82f6;
+          border-radius: 50%;
+          cursor: pointer;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+          transition: all 0.2s ease;
+        }
+        
+        .slider-thumb::-webkit-slider-thumb:hover {
+          transform: scale(1.1);
+          border-color: #1d4ed8;
+        }
+        
+        .slider-thumb::-moz-range-thumb {
+          height: 20px;
+          width: 20px;
+          background: white;
+          border: 3px solid #3b82f6;
+          border-radius: 50%;
+          cursor: pointer;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+      `}</styles>
+    </div>
+  );
+};
+
 export const FilterSidebar = ({ categories, loading = false }: FilterSidebarProps) => {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -26,6 +131,7 @@ export const FilterSidebar = ({ categories, loading = false }: FilterSidebarProp
     minPrice: searchParams.get("minPrice") || "",
     maxPrice: searchParams.get("maxPrice") || "",
     search: searchParams.get("search") || "",
+    rating: searchParams.get("rating") || "",
   });
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -36,29 +142,28 @@ export const FilterSidebar = ({ categories, loading = false }: FilterSidebarProp
     rating: false,
   });
 
-  const [priceRange, setPriceRange] = useState({
-    min: parseInt(localFilters.minPrice) || 0,
-    max: parseInt(localFilters.maxPrice) || 100000,
-  });
+  const [priceRange, setPriceRange] = useState([
+    parseInt(localFilters.minPrice) || 0,
+    parseInt(localFilters.maxPrice) || 100000,
+  ]);
 
-  const [isFilterApplied, setIsFilterApplied] = useState(false);
+  const [activeFilters, setActiveFilters] = useState(new Set());
 
-  // Predefined price ranges
-  const priceRanges = [
-    { label: "Under ₹1,000", min: 0, max: 1000 },
-    { label: "₹1,000 - ₹5,000", min: 1000, max: 5000 },
-    { label: "₹5,000 - ₹10,000", min: 5000, max: 10000 },
-    { label: "₹10,000 - ₹25,000", min: 10000, max: 25000 },
-    { label: "₹25,000 - ₹50,000", min: 25000, max: 50000 },
-    { label: "Above ₹50,000", min: 50000, max: null },
-  ];
+  useEffect(() => {
+    const active = new Set();
+    if (localFilters.type) active.add('type');
+    if (localFilters.category) active.add('category');
+    if (localFilters.minPrice || localFilters.maxPrice) active.add('price');
+    if (localFilters.rating) active.add('rating');
+    if (localFilters.search) active.add('search');
+    setActiveFilters(active);
+  }, [localFilters]);
 
   // Debounced filter application
   const debouncedApplyFilters = useCallback(() => {
     const timer = setTimeout(() => {
       applyFilters();
     }, 300);
-
     return () => clearTimeout(timer);
   }, [localFilters]);
 
@@ -70,56 +175,54 @@ export const FilterSidebar = ({ categories, loading = false }: FilterSidebarProp
     if (localFilters.minPrice) params.set("minPrice", localFilters.minPrice);
     if (localFilters.maxPrice) params.set("maxPrice", localFilters.maxPrice);
     if (localFilters.search) params.set("search", localFilters.search);
+    if (localFilters.rating) params.set("rating", localFilters.rating);
 
     router.push(`/products?${params.toString()}`);
-    setIsFilterApplied(true);
-    
-    // Reset the applied state after animation
-    setTimeout(() => setIsFilterApplied(false), 1000);
   };
 
-  // Filter categories based on search and type
-  const filteredCategories = categories.filter(category => {
-    const matchesSearch = category.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = !localFilters.type || category.type === localFilters.type;
-    return matchesSearch && matchesType;
-  });
-
-  const handleFilterChange = (key: string, value: string) => {
-    const newFilters = { ...localFilters, [key]: value };
+  const handleFilterToggle = (key: string, value: string) => {
+    const currentValue = localFilters[key];
+    const newValue = currentValue === value ? "" : value;
+    
+    const newFilters = { ...localFilters, [key]: newValue };
     setLocalFilters(newFilters);
     
-    // Auto-apply filters for better UX
+    // Auto-apply filters
     setTimeout(() => {
       const params = new URLSearchParams();
-      if (newFilters.type) params.set("type", newFilters.type);
-      if (newFilters.category) params.set("category", newFilters.category);
-      if (newFilters.minPrice) params.set("minPrice", newFilters.minPrice);
-      if (newFilters.maxPrice) params.set("maxPrice", newFilters.maxPrice);
-      if (newFilters.search) params.set("search", newFilters.search);
-      
+      Object.entries(newFilters).forEach(([k, v]) => {
+        if (v) params.set(k, v);
+      });
       router.push(`/products?${params.toString()}`);
     }, 100);
   };
 
-  const handlePriceRangeChange = (min: number, max: number | null) => {
+  const handlePriceRangeChange = (newRange) => {
+    setPriceRange(newRange);
     const newFilters = {
       ...localFilters,
-      minPrice: min.toString(),
-      maxPrice: max?.toString() || "",
+      minPrice: newRange[0].toString(),
+      maxPrice: newRange[1] === 100000 ? "" : newRange[1].toString(),
     };
     setLocalFilters(newFilters);
-    setPriceRange({ min, max: max || 100000 });
     
-    // Auto-apply price filters
+    // Auto-apply price filters with slight delay
     setTimeout(() => {
       const params = new URLSearchParams(searchParams);
-      params.set("minPrice", min.toString());
-      if (max) params.set("maxPrice", max.toString());
-      else params.delete("maxPrice");
-      
+      params.set("minPrice", newRange[0].toString());
+      if (newRange[1] !== 100000) {
+        params.set("maxPrice", newRange[1].toString());
+      } else {
+        params.delete("maxPrice");
+      }
       router.push(`/products?${params.toString()}`);
-    }, 100);
+    }, 500);
+  };
+
+  const handleRatingToggle = (rating: string) => {
+    const currentRating = localFilters.rating;
+    const newRating = currentRating === rating ? "" : rating;
+    handleFilterToggle('rating', newRating);
   };
 
   const toggleSection = (section: keyof typeof expandedSections) => {
@@ -136,21 +239,30 @@ export const FilterSidebar = ({ categories, loading = false }: FilterSidebarProp
       minPrice: "",
       maxPrice: "",
       search: "",
+      rating: "",
     };
     setLocalFilters(emptyFilters);
-    setPriceRange({ min: 0, max: 100000 });
+    setPriceRange([0, 100000]);
     setSearchTerm("");
     router.push("/products");
   };
 
   const getActiveFiltersCount = () => {
-    let count = 0;
-    if (localFilters.type) count++;
-    if (localFilters.category) count++;
-    if (localFilters.minPrice || localFilters.maxPrice) count++;
-    if (localFilters.search) count++;
-    return count;
+    return activeFilters.size;
   };
+
+  const formatPrice = (value) => {
+    if (value >= 100000) return "₹1L+";
+    if (value >= 1000) return `₹${(value/1000).toFixed(0)}K`;
+    return `₹${value}`;
+  };
+
+  // Filter categories based on search and type
+  const filteredCategories = categories.filter(category => {
+    const matchesSearch = category.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesType = !localFilters.type || category.type === localFilters.type;
+    return matchesSearch && matchesType;
+  });
 
   // Sync with URL params
   useEffect(() => {
@@ -160,31 +272,41 @@ export const FilterSidebar = ({ categories, loading = false }: FilterSidebarProp
       minPrice: searchParams.get("minPrice") || "",
       maxPrice: searchParams.get("maxPrice") || "",
       search: searchParams.get("search") || "",
+      rating: searchParams.get("rating") || "",
     });
+    
+    setPriceRange([
+      parseInt(searchParams.get("minPrice")) || 0,
+      parseInt(searchParams.get("maxPrice")) || 100000,
+    ]);
   }, [searchParams]);
 
   return (
     <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
       {/* Header */}
       <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-purple-50">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-gray-900 flex items-center">
             <Filter className="w-5 h-5 mr-2 text-blue-600" />
             Filters
             {getActiveFiltersCount() > 0 && (
-              <span className="ml-2 bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full font-medium animate-pulse">
+              <span className="ml-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs px-2 py-1 rounded-full font-medium animate-pulse shadow-lg">
                 {getActiveFiltersCount()}
               </span>
             )}
           </h2>
+        </div>
+        
+        {/* Clear Filters - Prominently placed */}
+        {getActiveFiltersCount() > 0 && (
           <button
             onClick={resetFilters}
-            className="text-sm text-red-600 hover:text-red-800 font-medium hover:underline transition-all duration-200 flex items-center space-x-1 hover:bg-red-50 px-2 py-1 rounded-lg"
+            className="w-full bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 shadow-md hover:shadow-lg transform hover:scale-105"
           >
-            <X className="w-3 h-3" />
-            <span>Clear All</span>
+            <RotateCcw className="w-4 h-4" />
+            <span>Clear All Filters</span>
           </button>
-        </div>
+        )}
       </div>
 
       <div className="divide-y divide-gray-100">
@@ -195,8 +317,11 @@ export const FilterSidebar = ({ categories, loading = false }: FilterSidebarProp
             className="flex items-center justify-between w-full text-left hover:bg-gray-50 p-2 rounded-lg transition-colors"
           >
             <h3 className="font-semibold text-gray-900 flex items-center">
-              <ShoppingBag className="w-4 h-4 mr-2 text-gray-600" />
+              <ShoppingBag className={`w-4 h-4 mr-2 ${activeFilters.has('type') ? 'text-blue-600' : 'text-gray-600'}`} />
               Product Type
+              {activeFilters.has('type') && (
+                <div className="w-2 h-2 bg-blue-500 rounded-full ml-2 animate-pulse"></div>
+              )}
             </h3>
             <ChevronDown 
               className={`w-4 h-4 text-gray-500 transition-all duration-300 ${
@@ -206,59 +331,37 @@ export const FilterSidebar = ({ categories, loading = false }: FilterSidebarProp
           </button>
           
           {expandedSections.type && (
-            <div className="mt-4 space-y-3 animate-in slide-in-from-top-2 duration-300">
-              <label className="flex items-center cursor-pointer group p-2 rounded-lg hover:bg-gray-50 transition-colors">
-                <input
-                  type="radio"
-                  name="type"
-                  value=""
-                  checked={localFilters.type === ""}
-                  onChange={(e) => handleFilterChange('type', e.target.value)}
-                  className="w-4 h-4 text-gray-600 border-gray-300 focus:ring-gray-500 focus:ring-2"
-                />
-                <span className="ml-3 text-sm text-gray-700 group-hover:text-gray-900 transition-colors">
-                  All Products
-                </span>
-                {localFilters.type === "" && (
-                  <Check className="w-4 h-4 ml-auto text-green-500 animate-in zoom-in duration-200" />
-                )}
-              </label>
-              
-              <label className="flex items-center cursor-pointer group p-2 rounded-lg hover:bg-blue-50 transition-colors">
-                <input
-                  type="radio"
-                  name="type"
-                  value="buy"
-                  checked={localFilters.type === "buy"}
-                  onChange={(e) => handleFilterChange('type', e.target.value)}
-                  className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500 focus:ring-2"
-                />
-                <span className="ml-3 text-sm text-gray-700 group-hover:text-blue-900 transition-colors flex items-center">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
-                  Purchase
-                </span>
-                {localFilters.type === "buy" && (
-                  <Check className="w-4 h-4 ml-auto text-green-500 animate-in zoom-in duration-200" />
-                )}
-              </label>
-              
-              <label className="flex items-center cursor-pointer group p-2 rounded-lg hover:bg-purple-50 transition-colors">
-                <input
-                  type="radio"
-                  name="type"
-                  value="rent"
-                  checked={localFilters.type === "rent"}
-                  onChange={(e) => handleFilterChange('type', e.target.value)}
-                  className="w-4 h-4 text-purple-600 border-gray-300 focus:ring-purple-500 focus:ring-2"
-                />
-                <span className="ml-3 text-sm text-gray-700 group-hover:text-purple-900 transition-colors flex items-center">
-                  <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
-                  Rental
-                </span>
-                {localFilters.type === "rent" && (
-                  <Check className="w-4 h-4 ml-auto text-green-500 animate-in zoom-in duration-200" />
-                )}
-              </label>
+            <div className="mt-4 space-y-2 animate-in slide-in-from-top-2 duration-300">
+              {[
+                { value: "", label: "All Products", color: "gray" },
+                { value: "buy", label: "Purchase", color: "blue" },
+                { value: "rent", label: "Rental", color: "purple" }
+              ].map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => handleFilterToggle('type', option.value)}
+                  className={`w-full flex items-center justify-between p-3 rounded-lg transition-all duration-200 ${
+                    localFilters.type === option.value
+                      ? `bg-gradient-to-r from-${option.color}-100 to-${option.color}-50 border-2 border-${option.color}-300 shadow-md transform scale-105`
+                      : 'hover:bg-gray-50 border-2 border-transparent'
+                  }`}
+                >
+                  <div className="flex items-center">
+                    <div className={`w-3 h-3 rounded-full mr-3 ${
+                      option.color === 'gray' ? 'bg-gray-400' :
+                      option.color === 'blue' ? 'bg-blue-500' : 'bg-purple-500'
+                    }`}></div>
+                    <span className={`text-sm font-medium ${
+                      localFilters.type === option.value ? `text-${option.color}-800` : 'text-gray-700'
+                    }`}>
+                      {option.label}
+                    </span>
+                  </div>
+                  {localFilters.type === option.value && (
+                    <Check className="w-4 h-4 text-green-500 animate-in zoom-in duration-200" />
+                  )}
+                </button>
+              ))}
             </div>
           )}
         </div>
@@ -270,8 +373,11 @@ export const FilterSidebar = ({ categories, loading = false }: FilterSidebarProp
             className="flex items-center justify-between w-full text-left hover:bg-gray-50 p-2 rounded-lg transition-colors"
           >
             <h3 className="font-semibold text-gray-900 flex items-center">
-              <Tag className="w-4 h-4 mr-2 text-gray-600" />
+              <Tag className={`w-4 h-4 mr-2 ${activeFilters.has('category') ? 'text-blue-600' : 'text-gray-600'}`} />
               Categories
+              {activeFilters.has('category') && (
+                <div className="w-2 h-2 bg-blue-500 rounded-full ml-2 animate-pulse"></div>
+              )}
             </h3>
             <ChevronDown 
               className={`w-4 h-4 text-gray-500 transition-all duration-300 ${
@@ -296,49 +402,52 @@ export const FilterSidebar = ({ categories, loading = false }: FilterSidebarProp
               
               {/* Category List */}
               <div className="space-y-2 max-h-64 overflow-y-auto">
-                <label className="flex items-center cursor-pointer group p-2 rounded-lg hover:bg-gray-50 transition-colors">
-                  <input
-                    type="radio"
-                    name="category"
-                    value=""
-                    checked={localFilters.category === ""}
-                    onChange={(e) => handleFilterChange('category', e.target.value)}
-                    className="w-4 h-4 text-gray-600 border-gray-300 focus:ring-gray-500 focus:ring-2"
-                  />
-                  <span className="ml-3 text-sm text-gray-700 group-hover:text-gray-900 transition-colors">
+                <button
+                  onClick={() => handleFilterToggle('category', '')}
+                  className={`w-full flex items-center justify-between p-3 rounded-lg transition-all duration-200 ${
+                    localFilters.category === ''
+                      ? 'bg-gradient-to-r from-gray-100 to-gray-50 border-2 border-gray-300 shadow-md transform scale-105'
+                      : 'hover:bg-gray-50 border-2 border-transparent'
+                  }`}
+                >
+                  <span className={`text-sm font-medium ${
+                    localFilters.category === '' ? 'text-gray-800' : 'text-gray-700'
+                  }`}>
                     All Categories
                   </span>
-                  {localFilters.category === "" && (
-                    <Check className="w-4 h-4 ml-auto text-green-500 animate-in zoom-in duration-200" />
+                  {localFilters.category === '' && (
+                    <Check className="w-4 h-4 text-green-500 animate-in zoom-in duration-200" />
                   )}
-                </label>
+                </button>
                 
                 {filteredCategories.map((category) => (
-                  <label key={category._id} className="flex items-center cursor-pointer group p-2 rounded-lg hover:bg-gray-50 transition-colors">
-                    <input
-                      type="radio"
-                      name="category"
-                      value={category.slug}
-                      checked={localFilters.category === category.slug}
-                      onChange={(e) => handleFilterChange('category', e.target.value)}
-                      className={`w-4 h-4 border-gray-300 focus:ring-2 transition-colors ${
-                        category.type === 'buy' 
-                          ? 'text-blue-600 focus:ring-blue-500' 
-                          : 'text-purple-600 focus:ring-purple-500'
-                      }`}
-                    />
-                    <span className="ml-3 text-sm text-gray-700 group-hover:text-gray-900 transition-colors flex items-center flex-1">
+                  <button
+                    key={category._id}
+                    onClick={() => handleFilterToggle('category', category.slug)}
+                    className={`w-full flex items-center justify-between p-3 rounded-lg transition-all duration-200 ${
+                      localFilters.category === category.slug
+                        ? `bg-gradient-to-r ${category.type === 'buy' ? 'from-blue-100 to-blue-50 border-2 border-blue-300' : 'from-purple-100 to-purple-50 border-2 border-purple-300'} shadow-md transform scale-105`
+                        : 'hover:bg-gray-50 border-2 border-transparent'
+                    }`}
+                  >
+                    <div className="flex items-center">
                       <div 
-                        className={`w-2 h-2 rounded-full mr-2 ${
+                        className={`w-3 h-3 rounded-full mr-3 ${
                           category.type === 'buy' ? 'bg-blue-500' : 'bg-purple-500'
                         }`}
                       ></div>
-                      {category.name}
-                    </span>
+                      <span className={`text-sm font-medium ${
+                        localFilters.category === category.slug 
+                          ? category.type === 'buy' ? 'text-blue-800' : 'text-purple-800'
+                          : 'text-gray-700'
+                      }`}>
+                        {category.name}
+                      </span>
+                    </div>
                     {localFilters.category === category.slug && (
-                      <Check className="w-4 h-4 ml-auto text-green-500 animate-in zoom-in duration-200" />
+                      <Check className="w-4 h-4 text-green-500 animate-in zoom-in duration-200" />
                     )}
-                  </label>
+                  </button>
                 ))}
                 
                 {filteredCategories.length === 0 && (
@@ -356,8 +465,11 @@ export const FilterSidebar = ({ categories, loading = false }: FilterSidebarProp
             className="flex items-center justify-between w-full text-left hover:bg-gray-50 p-2 rounded-lg transition-colors"
           >
             <h3 className="font-semibold text-gray-900 flex items-center">
-              <Palette className="w-4 h-4 mr-2 text-gray-600" />
+              <Palette className={`w-4 h-4 mr-2 ${activeFilters.has('price') ? 'text-blue-600' : 'text-gray-600'}`} />
               Price Range
+              {activeFilters.has('price') && (
+                <div className="w-2 h-2 bg-blue-500 rounded-full ml-2 animate-pulse"></div>
+              )}
             </h3>
             <ChevronDown 
               className={`w-4 h-4 text-gray-500 transition-all duration-300 ${
@@ -367,57 +479,14 @@ export const FilterSidebar = ({ categories, loading = false }: FilterSidebarProp
           </button>
           
           {expandedSections.price && (
-            <div className="mt-4 space-y-4 animate-in slide-in-from-top-2 duration-300">
-              {/* Predefined Price Ranges */}
-              <div className="space-y-2">
-                {priceRanges.map((range, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handlePriceRangeChange(range.min, range.max)}
-                    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all duration-200 flex items-center justify-between ${
-                      (parseInt(localFilters.minPrice) || 0) === range.min &&
-                      (parseInt(localFilters.maxPrice) || null) === range.max
-                        ? 'bg-gradient-to-r from-blue-100 to-purple-100 text-blue-800 border border-blue-300 shadow-sm'
-                        : 'hover:bg-gray-100 text-gray-700 border border-transparent'
-                    }`}
-                  >
-                    <span>{range.label}</span>
-                    {(parseInt(localFilters.minPrice) || 0) === range.min &&
-                     (parseInt(localFilters.maxPrice) || null) === range.max && (
-                      <Check className="w-4 h-4 text-green-500 animate-in zoom-in duration-200" />
-                    )}
-                  </button>
-                ))}
-              </div>
-              
-              {/* Custom Price Range */}
-              <div className="pt-4 border-t border-gray-100">
-                <p className="text-sm font-medium text-gray-700 mb-3">Custom Range</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Min Price</label>
-                    <input
-                      type="number"
-                      value={priceRange.min}
-                      onChange={(e) => setPriceRange(prev => ({ ...prev, min: parseInt(e.target.value) || 0 }))}
-                      onBlur={() => handlePriceRangeChange(priceRange.min, priceRange.max === 100000 ? null : priceRange.max)}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Max Price</label>
-                    <input
-                      type="number"
-                      value={priceRange.max === 100000 ? "" : priceRange.max}
-                      onChange={(e) => setPriceRange(prev => ({ ...prev, max: parseInt(e.target.value) || 100000 }))}
-                      onBlur={() => handlePriceRangeChange(priceRange.min, priceRange.max === 100000 ? null : priceRange.max)}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                      placeholder="Max"
-                    />
-                  </div>
-                </div>
-              </div>
+            <div className="mt-4 animate-in slide-in-from-top-2 duration-300">
+              <RangeSlider
+                min={0}
+                max={100000}
+                value={priceRange}
+                onChange={handlePriceRangeChange}
+                formatValue={formatPrice}
+              />
             </div>
           )}
         </div>
@@ -429,8 +498,11 @@ export const FilterSidebar = ({ categories, loading = false }: FilterSidebarProp
             className="flex items-center justify-between w-full text-left hover:bg-gray-50 p-2 rounded-lg transition-colors"
           >
             <h3 className="font-semibold text-gray-900 flex items-center">
-              <Star className="w-4 h-4 mr-2 text-gray-600" />
+              <Star className={`w-4 h-4 mr-2 ${activeFilters.has('rating') ? 'text-blue-600' : 'text-gray-600'}`} />
               Rating
+              {activeFilters.has('rating') && (
+                <div className="w-2 h-2 bg-blue-500 rounded-full ml-2 animate-pulse"></div>
+              )}
             </h3>
             <ChevronDown 
               className={`w-4 h-4 text-gray-500 transition-all duration-300 ${
@@ -442,13 +514,17 @@ export const FilterSidebar = ({ categories, loading = false }: FilterSidebarProp
           {expandedSections.rating && (
             <div className="mt-4 space-y-2 animate-in slide-in-from-top-2 duration-300">
               {[4, 3, 2, 1].map((rating) => (
-                <label key={rating} className="flex items-center cursor-pointer group p-2 rounded-lg hover:bg-yellow-50 transition-colors">
-                  <input
-                    type="checkbox"
-                    className="w-4 h-4 text-yellow-600 border-gray-300 rounded focus:ring-yellow-500 focus:ring-2"
-                  />
-                  <div className="ml-3 flex items-center">
-                    <div className="flex items-center">
+                <button
+                  key={rating}
+                  onClick={() => handleRatingToggle(rating.toString())}
+                  className={`w-full flex items-center justify-between p-3 rounded-lg transition-all duration-200 ${
+                    localFilters.rating === rating.toString()
+                      ? 'bg-gradient-to-r from-yellow-100 to-yellow-50 border-2 border-yellow-300 shadow-md transform scale-105'
+                      : 'hover:bg-yellow-50 border-2 border-transparent'
+                  }`}
+                >
+                  <div className="flex items-center">
+                    <div className="flex items-center mr-2">
                       {[1, 2, 3, 4, 5].map((star) => (
                         <Star
                           key={star}
@@ -460,9 +536,16 @@ export const FilterSidebar = ({ categories, loading = false }: FilterSidebarProp
                         />
                       ))}
                     </div>
-                    <span className="ml-2 text-sm text-gray-600">& Up</span>
+                    <span className={`text-sm font-medium ${
+                      localFilters.rating === rating.toString() ? 'text-yellow-800' : 'text-gray-600'
+                    }`}>
+                      & Up
+                    </span>
                   </div>
-                </label>
+                  {localFilters.rating === rating.toString() && (
+                    <Check className="w-4 h-4 text-green-500 animate-in zoom-in duration-200" />
+                  )}
+                </button>
               ))}
             </div>
           )}
