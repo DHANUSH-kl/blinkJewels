@@ -1,5 +1,3 @@
-// /componenet/products/FilterSidebar.tsx
-
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -38,6 +36,41 @@ const RangeSlider = ({ min, max, value, onChange, formatValue }) => {
 
   return (
     <div className="px-2 py-4">
+      <style jsx>{`
+        .slider-thumb::-webkit-slider-thumb {
+          appearance: none;
+          height: 20px;
+          width: 20px;
+          background: white;
+          border: 3px solid #3b82f6;
+          border-radius: 50%;
+          cursor: pointer;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+          transition: all 0.2s ease;
+        }
+        
+        .slider-thumb::-webkit-slider-thumb:hover {
+          transform: scale(1.1);
+          border-color: #1d4ed8;
+        }
+        
+        .slider-thumb::-moz-range-thumb {
+          height: 20px;
+          width: 20px;
+          background: white;
+          border: 3px solid #3b82f6;
+          border-radius: 50%;
+          cursor: pointer;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+          border: none;
+        }
+        
+        .slider-thumb::-moz-range-track {
+          background: transparent;
+          height: 8px;
+        }
+      `}</style>
+      
       <div className="relative mb-6">
         {/* Track */}
         <div className="absolute top-1/2 w-full h-2 bg-gray-200 rounded-full transform -translate-y-1/2"></div>
@@ -88,35 +121,6 @@ const RangeSlider = ({ min, max, value, onChange, formatValue }) => {
           {formatValue(value[1])}
         </div>
       </div>
-      
-      <styles jsx>{`
-        .slider-thumb::-webkit-slider-thumb {
-          appearance: none;
-          height: 20px;
-          width: 20px;
-          background: white;
-          border: 3px solid #3b82f6;
-          border-radius: 50%;
-          cursor: pointer;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-          transition: all 0.2s ease;
-        }
-        
-        .slider-thumb::-webkit-slider-thumb:hover {
-          transform: scale(1.1);
-          border-color: #1d4ed8;
-        }
-        
-        .slider-thumb::-moz-range-thumb {
-          height: 20px;
-          width: 20px;
-          background: white;
-          border: 3px solid #3b82f6;
-          border-radius: 50%;
-          cursor: pointer;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-        }
-      `}</styles>
     </div>
   );
 };
@@ -159,39 +163,61 @@ export const FilterSidebar = ({ categories, loading = false }: FilterSidebarProp
     setActiveFilters(active);
   }, [localFilters]);
 
-  // Debounced filter application
-  const debouncedApplyFilters = useCallback(() => {
-    const timer = setTimeout(() => {
-      applyFilters();
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [localFilters]);
-
-  const applyFilters = () => {
-    const params = new URLSearchParams();
-    
-    if (localFilters.type) params.set("type", localFilters.type);
-    if (localFilters.category) params.set("category", localFilters.category);
-    if (localFilters.minPrice) params.set("minPrice", localFilters.minPrice);
-    if (localFilters.maxPrice) params.set("maxPrice", localFilters.maxPrice);
-    if (localFilters.search) params.set("search", localFilters.search);
-    if (localFilters.rating) params.set("rating", localFilters.rating);
-
-    router.push(`/products?${params.toString()}`);
-  };
-
+  // Fixed filter toggle function
   const handleFilterToggle = (key: string, value: string) => {
     const currentValue = localFilters[key];
     const newValue = currentValue === value ? "" : value;
     
-    const newFilters = { ...localFilters, [key]: newValue };
+    let newFilters = { ...localFilters, [key]: newValue };
+    
+    // FIXED: When changing type, clear category selection to avoid conflicts
+    if (key === 'type') {
+      newFilters.category = "";
+    }
+    
     setLocalFilters(newFilters);
     
-    // Auto-apply filters
+    // Apply filters immediately
     setTimeout(() => {
       const params = new URLSearchParams();
       Object.entries(newFilters).forEach(([k, v]) => {
-        if (v) params.set(k, v);
+        if (v && v !== "") {
+          params.set(k, v);
+        }
+      });
+      router.push(`/products?${params.toString()}`);
+    }, 100);
+  };
+
+  // FIXED: Improved category selection function
+  const handleCategoryToggle = (categorySlug: string, categoryType: string) => {
+    let newFilters = { ...localFilters };
+    
+    // Create a unique identifier for the category that includes both slug and type
+    const currentCategoryKey = localFilters.category;
+    const currentTypeKey = localFilters.type;
+    
+    // Check if we're clicking on the currently selected category of the same type
+    const isCurrentlySelected = (currentCategoryKey === categorySlug && currentTypeKey === categoryType);
+    
+    if (isCurrentlySelected) {
+      // Deselect the category but keep the type
+      newFilters.category = "";
+    } else {
+      // Select the new category and set/update the type
+      newFilters.category = categorySlug;
+      newFilters.type = categoryType;
+    }
+    
+    setLocalFilters(newFilters);
+    
+    // Apply filters immediately
+    setTimeout(() => {
+      const params = new URLSearchParams();
+      Object.entries(newFilters).forEach(([k, v]) => {
+        if (v && v !== "") {
+          params.set(k, v);
+        }
       });
       router.push(`/products?${params.toString()}`);
     }, 100);
@@ -209,20 +235,29 @@ export const FilterSidebar = ({ categories, loading = false }: FilterSidebarProp
     // Auto-apply price filters with slight delay
     setTimeout(() => {
       const params = new URLSearchParams(searchParams);
-      params.set("minPrice", newRange[0].toString());
+      if (newRange[0] > 0) {
+        params.set("minPrice", newRange[0].toString());
+      } else {
+        params.delete("minPrice");
+      }
       if (newRange[1] !== 100000) {
         params.set("maxPrice", newRange[1].toString());
       } else {
         params.delete("maxPrice");
       }
+      
+      // Preserve other filters
+      if (localFilters.type) params.set("type", localFilters.type);
+      if (localFilters.category) params.set("category", localFilters.category);
+      if (localFilters.search) params.set("search", localFilters.search);
+      if (localFilters.rating) params.set("rating", localFilters.rating);
+      
       router.push(`/products?${params.toString()}`);
     }, 500);
   };
 
   const handleRatingToggle = (rating: string) => {
-    const currentRating = localFilters.rating;
-    const newRating = currentRating === rating ? "" : rating;
-    handleFilterToggle('rating', newRating);
+    handleFilterToggle('rating', rating);
   };
 
   const toggleSection = (section: keyof typeof expandedSections) => {
@@ -257,23 +292,38 @@ export const FilterSidebar = ({ categories, loading = false }: FilterSidebarProp
     return `₹${value}`;
   };
 
-  // Filter categories based on search and type
+  // FIXED: Show all categories, but group them properly
   const filteredCategories = categories.filter(category => {
     const matchesSearch = category.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = !localFilters.type || category.type === localFilters.type;
-    return matchesSearch && matchesType;
+    return matchesSearch;
   });
+
+  // FIXED: Group categories by slug to show both buy and rent versions
+  const groupedCategories = filteredCategories.reduce((acc, category) => {
+    if (!acc[category.slug]) {
+      acc[category.slug] = [];
+    }
+    acc[category.slug].push(category);
+    return acc;
+  }, {});
+
+  // FIXED: Helper function to check if a category is selected
+  const isCategorySelected = (categorySlug: string, categoryType: string) => {
+    return localFilters.category === categorySlug && localFilters.type === categoryType;
+  };
 
   // Sync with URL params
   useEffect(() => {
-    setLocalFilters({
+    const newFilters = {
       type: searchParams.get("type") || "",
       category: searchParams.get("category") || "",
       minPrice: searchParams.get("minPrice") || "",
       maxPrice: searchParams.get("maxPrice") || "",
       search: searchParams.get("search") || "",
       rating: searchParams.get("rating") || "",
-    });
+    };
+    
+    setLocalFilters(newFilters);
     
     setPriceRange([
       parseInt(searchParams.get("minPrice")) || 0,
@@ -290,14 +340,14 @@ export const FilterSidebar = ({ categories, loading = false }: FilterSidebarProp
             <Filter className="w-5 h-5 mr-2 text-blue-600" />
             Filters
             {getActiveFiltersCount() > 0 && (
-              <span className="ml-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs px-2 py-1 rounded-full font-medium animate-pulse shadow-lg">
+              <span className="ml-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs px-2 py-1 rounded-full font-medium shadow-lg">
                 {getActiveFiltersCount()}
               </span>
             )}
           </h2>
         </div>
         
-        {/* Clear Filters - Prominently placed */}
+        {/* Clear Filters */}
         {getActiveFiltersCount() > 0 && (
           <button
             onClick={resetFilters}
@@ -331,7 +381,7 @@ export const FilterSidebar = ({ categories, loading = false }: FilterSidebarProp
           </button>
           
           {expandedSections.type && (
-            <div className="mt-4 space-y-2 animate-in slide-in-from-top-2 duration-300">
+            <div className="mt-4 space-y-2">
               {[
                 { value: "", label: "All Products", color: "gray" },
                 { value: "buy", label: "Purchase", color: "blue" },
@@ -342,7 +392,11 @@ export const FilterSidebar = ({ categories, loading = false }: FilterSidebarProp
                   onClick={() => handleFilterToggle('type', option.value)}
                   className={`w-full flex items-center justify-between p-3 rounded-lg transition-all duration-200 ${
                     localFilters.type === option.value
-                      ? `bg-gradient-to-r from-${option.color}-100 to-${option.color}-50 border-2 border-${option.color}-300 shadow-md transform scale-105`
+                      ? option.color === 'gray' 
+                        ? 'bg-gray-100 border-2 border-gray-300 shadow-md'
+                        : option.color === 'blue'
+                        ? 'bg-blue-100 border-2 border-blue-300 shadow-md'
+                        : 'bg-purple-100 border-2 border-purple-300 shadow-md'
                       : 'hover:bg-gray-50 border-2 border-transparent'
                   }`}
                 >
@@ -352,13 +406,16 @@ export const FilterSidebar = ({ categories, loading = false }: FilterSidebarProp
                       option.color === 'blue' ? 'bg-blue-500' : 'bg-purple-500'
                     }`}></div>
                     <span className={`text-sm font-medium ${
-                      localFilters.type === option.value ? `text-${option.color}-800` : 'text-gray-700'
+                      localFilters.type === option.value 
+                        ? option.color === 'gray' ? 'text-gray-800' : 
+                          option.color === 'blue' ? 'text-blue-800' : 'text-purple-800'
+                        : 'text-gray-700'
                     }`}>
                       {option.label}
                     </span>
                   </div>
                   {localFilters.type === option.value && (
-                    <Check className="w-4 h-4 text-green-500 animate-in zoom-in duration-200" />
+                    <Check className="w-4 h-4 text-green-500" />
                   )}
                 </button>
               ))}
@@ -387,7 +444,7 @@ export const FilterSidebar = ({ categories, loading = false }: FilterSidebarProp
           </button>
           
           {expandedSections.category && (
-            <div className="mt-4 space-y-4 animate-in slide-in-from-top-2 duration-300">
+            <div className="mt-4 space-y-4">
               {/* Category Search */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -406,7 +463,7 @@ export const FilterSidebar = ({ categories, loading = false }: FilterSidebarProp
                   onClick={() => handleFilterToggle('category', '')}
                   className={`w-full flex items-center justify-between p-3 rounded-lg transition-all duration-200 ${
                     localFilters.category === ''
-                      ? 'bg-gradient-to-r from-gray-100 to-gray-50 border-2 border-gray-300 shadow-md transform scale-105'
+                      ? 'bg-gray-100 border-2 border-gray-300 shadow-md'
                       : 'hover:bg-gray-50 border-2 border-transparent'
                   }`}
                 >
@@ -416,41 +473,48 @@ export const FilterSidebar = ({ categories, loading = false }: FilterSidebarProp
                     All Categories
                   </span>
                   {localFilters.category === '' && (
-                    <Check className="w-4 h-4 text-green-500 animate-in zoom-in duration-200" />
+                    <Check className="w-4 h-4 text-green-500" />
                   )}
                 </button>
                 
-                {filteredCategories.map((category) => (
-                  <button
-                    key={category._id}
-                    onClick={() => handleFilterToggle('category', category.slug)}
-                    className={`w-full flex items-center justify-between p-3 rounded-lg transition-all duration-200 ${
-                      localFilters.category === category.slug
-                        ? `bg-gradient-to-r ${category.type === 'buy' ? 'from-blue-100 to-blue-50 border-2 border-blue-300' : 'from-purple-100 to-purple-50 border-2 border-purple-300'} shadow-md transform scale-105`
-                        : 'hover:bg-gray-50 border-2 border-transparent'
-                    }`}
-                  >
-                    <div className="flex items-center">
-                      <div 
-                        className={`w-3 h-3 rounded-full mr-3 ${
-                          category.type === 'buy' ? 'bg-blue-500' : 'bg-purple-500'
+                {/* FIXED: Show grouped categories with both buy and rent options */}
+                {Object.entries(groupedCategories).map(([slug, categoryGroup]) => (
+                  <div key={slug} className="space-y-1">
+                    {categoryGroup.map((category) => (
+                      <button
+                        key={`${category._id}-${category.type}`}
+                        onClick={() => handleCategoryToggle(category.slug, category.type)}
+                        className={`w-full flex items-center justify-between p-3 rounded-lg transition-all duration-200 ${
+                          isCategorySelected(category.slug, category.type)
+                            ? category.type === 'buy' 
+                              ? 'bg-blue-100 border-2 border-blue-300 shadow-md' 
+                              : 'bg-purple-100 border-2 border-purple-300 shadow-md'
+                            : 'hover:bg-gray-50 border-2 border-transparent'
                         }`}
-                      ></div>
-                      <span className={`text-sm font-medium ${
-                        localFilters.category === category.slug 
-                          ? category.type === 'buy' ? 'text-blue-800' : 'text-purple-800'
-                          : 'text-gray-700'
-                      }`}>
-                        {category.name}
-                      </span>
-                    </div>
-                    {localFilters.category === category.slug && (
-                      <Check className="w-4 h-4 text-green-500 animate-in zoom-in duration-200" />
-                    )}
-                  </button>
+                      >
+                        <div className="flex items-center">
+                          <div 
+                            className={`w-3 h-3 rounded-full mr-3 ${
+                              category.type === 'buy' ? 'bg-blue-500' : 'bg-purple-500'
+                            }`}
+                          ></div>
+                          <span className={`text-sm font-medium ${
+                            isCategorySelected(category.slug, category.type)
+                              ? category.type === 'buy' ? 'text-blue-800' : 'text-purple-800'
+                              : 'text-gray-700'
+                          }`}>
+                            {category.name} ({category.type === 'buy' ? 'Purchase' : 'Rental'})
+                          </span>
+                        </div>
+                        {isCategorySelected(category.slug, category.type) && (
+                          <Check className="w-4 h-4 text-green-500" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
                 ))}
                 
-                {filteredCategories.length === 0 && (
+                {Object.keys(groupedCategories).length === 0 && (
                   <p className="text-sm text-gray-500 italic text-center py-4">No categories found</p>
                 )}
               </div>
@@ -479,7 +543,7 @@ export const FilterSidebar = ({ categories, loading = false }: FilterSidebarProp
           </button>
           
           {expandedSections.price && (
-            <div className="mt-4 animate-in slide-in-from-top-2 duration-300">
+            <div className="mt-4">
               <RangeSlider
                 min={0}
                 max={100000}
@@ -512,14 +576,14 @@ export const FilterSidebar = ({ categories, loading = false }: FilterSidebarProp
           </button>
           
           {expandedSections.rating && (
-            <div className="mt-4 space-y-2 animate-in slide-in-from-top-2 duration-300">
+            <div className="mt-4 space-y-2">
               {[4, 3, 2, 1].map((rating) => (
                 <button
                   key={rating}
                   onClick={() => handleRatingToggle(rating.toString())}
                   className={`w-full flex items-center justify-between p-3 rounded-lg transition-all duration-200 ${
                     localFilters.rating === rating.toString()
-                      ? 'bg-gradient-to-r from-yellow-100 to-yellow-50 border-2 border-yellow-300 shadow-md transform scale-105'
+                      ? 'bg-yellow-100 border-2 border-yellow-300 shadow-md'
                       : 'hover:bg-yellow-50 border-2 border-transparent'
                   }`}
                 >
@@ -543,7 +607,7 @@ export const FilterSidebar = ({ categories, loading = false }: FilterSidebarProp
                     </span>
                   </div>
                   {localFilters.rating === rating.toString() && (
-                    <Check className="w-4 h-4 text-green-500 animate-in zoom-in duration-200" />
+                    <Check className="w-4 h-4 text-green-500" />
                   )}
                 </button>
               ))}
