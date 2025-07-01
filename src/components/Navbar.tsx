@@ -17,7 +17,10 @@ const Navbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
-  
+  const [cartCount, setCartCount] = useState(0);
+  const [wishlistCount, setWishlistCount] = useState(0);
+
+
   const accountRef = useRef<HTMLDivElement>(null);
   const buyDropdownRef = useRef<HTMLDivElement>(null);
   const rentDropdownRef = useRef<HTMLDivElement>(null);
@@ -29,14 +32,14 @@ const Navbar = () => {
       try {
         setCategoriesLoading(true);
         const res = await fetch("/api/categories");
-        
+
         if (!res.ok) {
           throw new Error(`HTTP error! status: ${res.status}`);
         }
-        
+
         const data = await res.json();
         console.log("Categories data:", data); // Debug log
-        
+
         // Handle different possible response structures
         if (Array.isArray(data)) {
           // If data is an array, filter by type
@@ -63,9 +66,36 @@ const Navbar = () => {
         setCategoriesLoading(false);
       }
     };
-    
+
     fetchCategories();
   }, []);
+
+  useEffect(() => {
+    const fetchCart = async () => {
+      try {
+        const res = await fetch("/api/cart");
+        const data = await res.json();
+        setCartCount(data?.items?.length || 0);
+      } catch {
+        setCartCount(0);
+      }
+    };
+
+    const fetchWishlist = async () => {
+      try {
+        const res = await fetch("/api/wishlist");
+        const data = await res.json();
+        setWishlistCount(data?.count || 0); // ✅ use count
+      } catch {
+        setWishlistCount(0);
+      }
+    };
+
+
+    fetchCart();
+    fetchWishlist();
+  }, []);
+
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -128,7 +158,7 @@ const Navbar = () => {
                 <span>Buy</span>
                 <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${buyDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
-              
+
               {buyDropdownOpen && (
                 <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-gray-200 py-4 z-50 animate-in slide-in-from-top-2 duration-200">
                   <div className="px-4 py-2 border-b border-gray-100">
@@ -168,7 +198,7 @@ const Navbar = () => {
                 <span>Rent</span>
                 <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${rentDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
-              
+
               {rentDropdownOpen && (
                 <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-gray-200 py-4 z-50 animate-in slide-in-from-top-2 duration-200">
                   <div className="px-4 py-2 border-b border-gray-100">
@@ -202,7 +232,7 @@ const Navbar = () => {
 
           {/* Enhanced Search Bar (Desktop) */}
           <div className="hidden lg:flex flex-1 max-w-lg mx-8">
-            <EnhancedSearchBar 
+            <EnhancedSearchBar
               placeholder="Search for jewelry..."
               onSearch={handleSearch}
               className="w-full"
@@ -220,22 +250,35 @@ const Navbar = () => {
             </button>
 
             {/* Wishlist */}
-            <Link 
-              href="/wishlist" 
-              className="p-2 rounded-xl hover:bg-gray-100 transition-colors duration-200"
+            <Link
+              href="/wishlist"
+              className="relative p-2 rounded-xl hover:bg-gray-100 transition-colors duration-200"
               title="Wishlist"
             >
               <Heart className="w-5 h-5" />
+              {wishlistCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                  {wishlistCount}
+                </span>
+              )}
             </Link>
 
+
+
             {/* Cart */}
-            <Link 
-              href="/cart" 
-              className="p-2 rounded-xl hover:bg-gray-100 transition-colors duration-200"
+            <Link
+              href="/cart"
+              className="relative p-2 rounded-xl hover:bg-gray-100 transition-colors duration-200"
               title="Cart"
             >
               <ShoppingCart className="w-5 h-5" />
+              {cartCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
+                  {cartCount}
+                </span>
+              )}
             </Link>
+
 
             {/* Account Dropdown */}
             <div ref={accountRef} className="relative">
@@ -245,7 +288,7 @@ const Navbar = () => {
               >
                 <User className="w-5 h-5" />
               </button>
-              
+
               {accountOpen && (
                 <div className="absolute top-full right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-200 py-4 z-50 animate-in slide-in-from-top-2 duration-200">
                   {session?.user ? (
@@ -255,22 +298,22 @@ const Navbar = () => {
                         <p className="text-sm text-gray-500">{session.user.email}</p>
                       </div>
                       <div className="py-2">
-                        <Link 
-                          href="/profile" 
+                        <Link
+                          href="/profile"
                           className="block px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-200"
                           onClick={() => setAccountOpen(false)}
                         >
                           Profile
                         </Link>
-                        <Link 
-                          href="/orders" 
+                        <Link
+                          href="/orders"
                           className="block px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-200"
                           onClick={() => setAccountOpen(false)}
                         >
                           My Orders
                         </Link>
-                        <Link 
-                          href="/track-order" 
+                        <Link
+                          href="/track-order"
                           className="block px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-200"
                           onClick={() => setAccountOpen(false)}
                         >
@@ -292,8 +335,8 @@ const Navbar = () => {
                       >
                         Sign In
                       </button>
-                      <Link 
-                        href="/signup" 
+                      <Link
+                        href="/signup"
                         className="block px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-200"
                         onClick={() => setAccountOpen(false)}
                       >
@@ -318,7 +361,7 @@ const Navbar = () => {
         {/* Enhanced Mobile Search Bar */}
         {searchOpen && (
           <div className="lg:hidden mt-4 animate-in slide-in-from-top-2 duration-200">
-            <EnhancedSearchBar 
+            <EnhancedSearchBar
               placeholder="Search for jewelry..."
               onSearch={handleSearch}
               isMobile={true}

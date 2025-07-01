@@ -59,7 +59,7 @@ function ImageGallery({ images, productTitle }: { images: { url: string; public_
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [imageLoading, setImageLoading] = useState<{ [key: number]: boolean }>({});
     const [imageErrors, setImageErrors] = useState<{ [key: number]: boolean }>({});
-    
+
     // Refs for focus management
     const fullscreenRef = useRef<HTMLDivElement>(null);
     const previousFocusRef = useRef<HTMLElement | null>(null);
@@ -76,7 +76,7 @@ function ImageGallery({ images, productTitle }: { images: { url: string; public_
     // Enhanced keyboard navigation with better event handling
     const handleKeyDown = useCallback((e: KeyboardEvent) => {
         if (!isFullscreen) return;
-        
+
         switch (e.key) {
             case 'ArrowRight':
                 e.preventDefault();
@@ -114,7 +114,7 @@ function ImageGallery({ images, productTitle }: { images: { url: string; public_
     // Preload adjacent images for better UX
     useEffect(() => {
         if (images.length <= 1) return;
-        
+
         const preloadImage = (index: number) => {
             if (index >= 0 && index < images.length && !imageErrors[index]) {
                 const img = new window.Image();
@@ -125,7 +125,7 @@ function ImageGallery({ images, productTitle }: { images: { url: string; public_
         // Preload next and previous images
         const nextIndex = (selectedImageIndex + 1) % images.length;
         const prevIndex = (selectedImageIndex - 1 + images.length) % images.length;
-        
+
         preloadImage(nextIndex);
         preloadImage(prevIndex);
     }, [selectedImageIndex, images, imageErrors]);
@@ -136,12 +136,12 @@ function ImageGallery({ images, productTitle }: { images: { url: string; public_
             // Save current focus and prevent body scroll
             previousFocusRef.current = document.activeElement as HTMLElement;
             document.body.style.overflow = 'hidden';
-            
+
             // Focus the fullscreen container for keyboard navigation
             setTimeout(() => {
                 fullscreenRef.current?.focus();
             }, 100);
-            
+
             // Add keyboard listener
             document.addEventListener('keydown', handleKeyDown);
         } else {
@@ -149,7 +149,7 @@ function ImageGallery({ images, productTitle }: { images: { url: string; public_
             document.body.style.overflow = 'unset';
             previousFocusRef.current?.focus();
         }
-        
+
         return () => {
             document.body.style.overflow = 'unset';
             document.removeEventListener('keydown', handleKeyDown);
@@ -160,7 +160,7 @@ function ImageGallery({ images, productTitle }: { images: { url: string; public_
     const [autoPlay, setAutoPlay] = useState(false);
     useEffect(() => {
         if (!autoPlay || images.length <= 1 || isFullscreen) return;
-        
+
         const interval = setInterval(nextImage, 4000);
         return () => clearInterval(interval);
     }, [autoPlay, nextImage, images.length, isFullscreen]);
@@ -181,7 +181,7 @@ function ImageGallery({ images, productTitle }: { images: { url: string; public_
                                 <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
                             </div>
                         )}
-                        
+
                         <Image
                             src={getImageSrc(selectedImageIndex)}
                             alt={`${productTitle} - Image ${selectedImageIndex + 1}`}
@@ -218,9 +218,8 @@ function ImageGallery({ images, productTitle }: { images: { url: string; public_
                             {images.length > 1 && (
                                 <button
                                     onClick={() => setAutoPlay(!autoPlay)}
-                                    className={`p-2 rounded-full backdrop-blur-sm z-10 transition-colors focus:outline-none focus:ring-2 focus:ring-white/50 ${
-                                        autoPlay ? 'bg-blue-500 hover:bg-blue-600 text-white' : 'bg-black/50 hover:bg-black/70 text-white'
-                                    }`}
+                                    className={`p-2 rounded-full backdrop-blur-sm z-10 transition-colors focus:outline-none focus:ring-2 focus:ring-white/50 ${autoPlay ? 'bg-blue-500 hover:bg-blue-600 text-white' : 'bg-black/50 hover:bg-black/70 text-white'
+                                        }`}
                                     aria-label={autoPlay ? "Stop slideshow" : "Start slideshow"}
                                 >
                                     {autoPlay ? <Minus className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
@@ -253,11 +252,10 @@ function ImageGallery({ images, productTitle }: { images: { url: string; public_
                                 <button
                                     key={index}
                                     onClick={() => setSelectedImageIndex(index)}
-                                    className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
-                                        selectedImageIndex === index
+                                    className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${selectedImageIndex === index
                                             ? 'border-blue-500 ring-2 ring-blue-200 scale-105'
                                             : 'border-gray-200 hover:border-gray-300 hover:scale-102'
-                                    }`}
+                                        }`}
                                     aria-label={`View image ${index + 1} of ${images.length}`}
                                     role="tab"
                                     aria-selected={selectedImageIndex === index}
@@ -281,7 +279,7 @@ function ImageGallery({ images, productTitle }: { images: { url: string; public_
 
             {/* Enhanced Fullscreen Modal */}
             {isFullscreen && (
-                <div 
+                <div
                     ref={fullscreenRef}
                     className="fixed inset-0 z-[9999] bg-black/95 flex items-center justify-center p-4"
                     onClick={() => setIsFullscreen(false)}
@@ -309,7 +307,7 @@ function ImageGallery({ images, productTitle }: { images: { url: string; public_
                     </button>
 
                     {/* Image Container */}
-                    <div 
+                    <div
                         className="relative w-full h-full max-w-6xl max-h-full flex items-center justify-center"
                         onClick={(e) => e.stopPropagation()}
                     >
@@ -319,7 +317,7 @@ function ImageGallery({ images, productTitle }: { images: { url: string; public_
                                     <Loader2 className="w-12 h-12 animate-spin text-white" />
                                 </div>
                             )}
-                            
+
                             <Image
                                 src={getImageSrc(selectedImageIndex)}
                                 alt={`${productTitle} - Fullscreen view ${selectedImageIndex + 1}`}
@@ -336,9 +334,9 @@ function ImageGallery({ images, productTitle }: { images: { url: string; public_
                         {images.length > 1 && (
                             <>
                                 <button
-                                    onClick={(e) => { 
-                                        e.stopPropagation(); 
-                                        prevImage(); 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        prevImage();
                                     }}
                                     className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/70 hover:bg-black/90 text-white p-4 rounded-full backdrop-blur-sm transition-colors focus:outline-none focus:ring-2 focus:ring-white/50"
                                     aria-label={`Previous image (${((selectedImageIndex - 1 + images.length) % images.length) + 1} of ${images.length})`}
@@ -346,9 +344,9 @@ function ImageGallery({ images, productTitle }: { images: { url: string; public_
                                     <ChevronLeft className="w-8 h-8" />
                                 </button>
                                 <button
-                                    onClick={(e) => { 
-                                        e.stopPropagation(); 
-                                        nextImage(); 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        nextImage();
                                     }}
                                     className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/70 hover:bg-black/90 text-white p-4 rounded-full backdrop-blur-sm transition-colors focus:outline-none focus:ring-2 focus:ring-white/50"
                                     aria-label={`Next image (${((selectedImageIndex + 1) % images.length) + 1} of ${images.length})`}
@@ -367,9 +365,8 @@ function ImageGallery({ images, productTitle }: { images: { url: string; public_
                                                     e.stopPropagation();
                                                     setSelectedImageIndex(index);
                                                 }}
-                                                className={`w-2 h-2 rounded-full transition-colors focus:outline-none focus:ring-1 focus:ring-white/50 ${
-                                                    index === selectedImageIndex ? 'bg-white' : 'bg-white/40 hover:bg-white/70'
-                                                }`}
+                                                className={`w-2 h-2 rounded-full transition-colors focus:outline-none focus:ring-1 focus:ring-white/50 ${index === selectedImageIndex ? 'bg-white' : 'bg-white/40 hover:bg-white/70'
+                                                    }`}
                                                 aria-label={`Go to image ${index + 1}`}
                                             />
                                         ))}
@@ -444,8 +441,8 @@ export default function ProductDetailClient({ product, initialWishlist, original
             {/* Enhanced Header */}
             <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-gray-200">
                 <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-                    <Link 
-                        href="/home" 
+                    <Link
+                        href="/home"
                         className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-lg px-2 py-1"
                         aria-label="Go back to home page"
                     >
@@ -453,7 +450,7 @@ export default function ProductDetailClient({ product, initialWishlist, original
                         <span className="font-medium">Back to Home</span>
                     </Link>
                     <div className="flex items-center gap-3">
-                        <button 
+                        <button
                             onClick={onShare}
                             disabled={isSharing}
                             className="p-2 hover:bg-gray-100 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
@@ -465,13 +462,15 @@ export default function ProductDetailClient({ product, initialWishlist, original
                                 <Share2 className="w-5 h-5 text-gray-600" />
                             )}
                         </button>
-                        <WishlistToggleWrapper
-                            productId={product._id}
-                            initialState={initialWishlist}
-                        />
+
+                        {/* <WishlistToggleWrapper
+        productId={product._id}
+        initialState={initialWishlist}
+      /> */}
                     </div>
                 </div>
             </header>
+
 
             {/* Main Content */}
             <main className="max-w-7xl mx-auto px-6 py-8">
@@ -512,9 +511,9 @@ export default function ProductDetailClient({ product, initialWishlist, original
                             )}
                         </div>
 
-                        <ImageGallery 
-                            images={product.images || [{ url: '/placeholder-image.jpg', public_id: 'placeholder' }]} 
-                            productTitle={product.title} 
+                        <ImageGallery
+                            images={product.images || [{ url: '/placeholder-image.jpg', public_id: 'placeholder' }]}
+                            productTitle={product.title}
                         />
                     </section>
 
@@ -708,18 +707,16 @@ export default function ProductDetailClient({ product, initialWishlist, original
                                 </div>
                                 <div className="flex justify-between">
                                     <span className="text-gray-600">Type:</span>
-                                    <span className={`font-medium capitalize ${
-                                        product.type === 'rent' ? 'text-purple-700' : 'text-blue-700'
-                                    }`}>
+                                    <span className={`font-medium capitalize ${product.type === 'rent' ? 'text-purple-700' : 'text-blue-700'
+                                        }`}>
                                         {product.type}
                                     </span>
                                 </div>
                                 <div className="flex justify-between">
                                     <span className="text-gray-600">Stock:</span>
-                                    <span className={`font-medium ${
-                                        product.stock > 10 ? 'text-green-600' : 
-                                        product.stock > 0 ? 'text-yellow-600' : 'text-red-600'
-                                    }`}>
+                                    <span className={`font-medium ${product.stock > 10 ? 'text-green-600' :
+                                            product.stock > 0 ? 'text-yellow-600' : 'text-red-600'
+                                        }`}>
                                         {product.stock > 0 ? `${product.stock} available` : 'Out of stock'}
                                     </span>
                                 </div>
